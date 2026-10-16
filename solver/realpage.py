@@ -74,19 +74,35 @@ _HOOK_JS = r"""
 
 async def _human_drag(cdp, slider: dict, dist: float):
     """Exact kinematics proven in solve.py (3/3 T001) - natural ballistic overshoot + smooth drift back."""
-    max_track = 252.0
+    max_track = 259.0
     dist = max(10.0, min(max_track, dist))
 
     sx, sy = slider["x"], slider["y"]
+
+    # 1. Natural mouse approach: simulate moving cursor towards the slider handle
+    approach_x = sx - random.uniform(30.0, 50.0)
+    approach_y = sy + random.uniform(5.0, 15.0)
+    for step in range(1, 5):
+        frac = step / 4.0
+        ax = approach_x + (sx - approach_x) * frac
+        ay = approach_y + (sy - approach_y) * frac
+        await cdp.send("Input.dispatchMouseEvent", {
+            "type": "mouseMoved", "x": ax, "y": ay})
+        await asyncio.sleep(0.015)
+
+    # Hover pause on handle before grabbing
+    await asyncio.sleep(random.uniform(0.10, 0.18))
+
     await cdp.send("Input.dispatchMouseEvent", {
         "type": "mousePressed", "x": sx, "y": sy, "button": "left", "clickCount": 1})
-    await asyncio.sleep(random.uniform(0.06, 0.10))
+    await asyncio.sleep(random.uniform(0.08, 0.12))
 
-    # Cap overshoot so mouse never clips beyond slider track boundary (~252px)
-    overshoot_amt = random.uniform(5.0, 9.0)
+    # Ballistic overshoot
+    overshoot_amt = random.uniform(5.0, 8.0)
     if dist + overshoot_amt > max_track:
         overshoot_amt = max(0.5, max_track - dist)
     over = min(max_track, dist + overshoot_amt)
+
     n = 42
     for i in range(1, n + 1):
         t = i / n
@@ -114,7 +130,7 @@ async def _human_drag(cdp, slider: dict, dist: float):
 
     await cdp.send("Input.dispatchMouseEvent", {
         "type": "mouseMoved", "x": sx + dist, "y": sy, "button": "left"})
-    await asyncio.sleep(0.16 + random.uniform(0.0, 0.10))
+    await asyncio.sleep(0.18 + random.uniform(0.0, 0.10))
     await cdp.send("Input.dispatchMouseEvent", {
         "type": "mouseReleased", "x": sx + dist, "y": sy, "button": "left"})
 
@@ -195,6 +211,8 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
                             f_code = res_dict.get("VerifyCode") or res_dict.get("Code") or ""
                             if f_code:
                                 print(f"    ⚠ Aliyun rejected attempt ({f_code})")
+                            if "F001" in str(f_code):
+                                attempt_failed["f001"] = True
                         elif res_dict.get("VerifyResult") is True:
                             verify_success["v"] = res_dict
                 except Exception:
@@ -222,6 +240,7 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
         # Solve loop
         for attempt in range(1, max_attempts + 1):
             attempt_failed["v"] = False
+            attempt_failed["f001"] = False
 
             # Wait for slider handle to mount (fast polling 100ms)
             slider = None
@@ -309,12 +328,13 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
             if scale < 0.8 or scale > 1.3:
                 scale = 300.0 / 296.0
 
-            target = g["gap_x"] * scale
+            gap = g.get("slide_dist") if g.get("slide_dist") is not None else g.get("gap_x", 0)
+            target = gap * scale
             dist = float(_invert(target))
             if dist < 10.0:
                 dist = 50.0
 
-            print(f"  ⚡ [Attempt #{attempt}] Gap: {g.get('gap_x')}px ({g.get('method')}) -> Target drag: {dist:.1f}px")
+            print(f"  ⚡ [Attempt #{attempt}] Gap: {gap}px (raw: {g.get('gap_x')}, {g.get('method')}) -> Target drag: {dist:.1f}px")
 
             await _human_drag(cdp, slider, dist)
 
@@ -435,11 +455,27 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
                 log.warning(f"Aliyun passed on attempt {attempt} but OTP screen did not mount. Alert: {toast_err}")
 
             images.clear()
-            await page.evaluate("""() => {
-                const btn = document.getElementById('aliyunCaptcha-btn-refresh');
-                if (btn) btn.click();
-            }""")
-            await page.wait_for_timeout(1500)
+            if attempt_failed.get("f001") or attempt % 3 == 0:
+                print("  🔄 Resetting captcha popup for fresh challenge...")
+                await page.evaluate("""() => {
+                    const btn = document.getElementById('aliyunCaptcha-btn-close') ||
+                                document.querySelector('.aliyunCaptcha-btn-close') ||
+                                document.querySelector('[class*="close-btn"]');
+                    if (btn) btn.click();
+                }""")
+                await page.wait_for_timeout(800)
+                try:
+                    btn = page.locator('button.qwenchat-email-otp-panel-button').first
+                    await btn.click(force=True)
+                except Exception:
+                    pass
+                await page.wait_for_timeout(1800)
+            else:
+                await page.evaluate("""() => {
+                    const btn = document.getElementById('aliyunCaptcha-btn-refresh');
+                    if (btn) btn.click();
+                }""")
+                await page.wait_for_timeout(1200)
 
         return {
             "solved": False,
