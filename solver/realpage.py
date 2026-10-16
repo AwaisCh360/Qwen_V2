@@ -73,13 +73,38 @@ _HOOK_JS = r"""
 """
 
 async def _human_drag(cdp, slider: dict, dist: float):
-    """Exact kinematics proven in solve.py (3/3 T001) - natural ballistic overshoot + smooth drift back."""
-    sx, sy = slider["x"], slider["y"]
-    await cdp.send("Input.dispatchMouseEvent", {
-        "type": "mousePressed", "x": sx, "y": sy, "button": "left", "clickCount": 1})
-    await asyncio.sleep(random.uniform(0.06, 0.10))
+    """Natural ballistic kinematics with proper pointer events, wall boundary check, and approach."""
+    max_track = 254.0
+    dist = max(10.0, min(max_track, dist))
 
-    over = dist + random.uniform(6.0, 11.0)
+    sx, sy = slider["x"], slider["y"]
+
+    # Natural hover approach from random screen position to slider handle
+    viewport_w, viewport_h = 1280, 800
+    start_mouse_x = random.uniform(viewport_w * 0.3, viewport_w * 0.6)
+    start_mouse_y = random.uniform(viewport_h * 0.3, viewport_h * 0.6)
+
+    approach_steps = 15
+    for k in range(1, approach_steps + 1):
+        at = k / approach_steps
+        ax = start_mouse_x + (sx - start_mouse_x) * at
+        ay = start_mouse_y + (sy - start_mouse_y) * at
+        await cdp.send("Input.dispatchMouseEvent", {
+            "type": "mouseMoved", "x": ax, "y": ay, "buttons": 0})
+        await asyncio.sleep(0.015)
+    await asyncio.sleep(random.uniform(0.10, 0.18))
+
+    # Mouse pressed with proper buttons state
+    await cdp.send("Input.dispatchMouseEvent", {
+        "type": "mousePressed", "x": sx, "y": sy, "button": "left", "buttons": 1, "clickCount": 1})
+    await asyncio.sleep(random.uniform(0.08, 0.14))
+
+    # Ballistic overshoot (capped so it never hits the right wall)
+    overshoot_amt = random.uniform(5.0, 9.0)
+    if dist + overshoot_amt > max_track:
+        overshoot_amt = max(0.5, max_track - dist)
+    over = min(max_track, dist + overshoot_amt)
+
     n = 42
     for i in range(1, n + 1):
         t = i / n
@@ -88,7 +113,8 @@ async def _human_drag(cdp, slider: dict, dist: float):
             "type": "mouseMoved",
             "x": sx + over * ease,
             "y": sy + np.sin(t * 5.0) * 1.2,
-            "button": "left"
+            "button": "left",
+            "buttons": 1
         })
         await asyncio.sleep(0.011 + (i % 4) * 0.004)
 
@@ -101,15 +127,16 @@ async def _human_drag(cdp, slider: dict, dist: float):
             "type": "mouseMoved",
             "x": sx + cur,
             "y": sy + random.uniform(-0.6, 0.6),
-            "button": "left"
+            "button": "left",
+            "buttons": 1
         })
         await asyncio.sleep(0.02 + random.uniform(0.0, 0.015))
 
     await cdp.send("Input.dispatchMouseEvent", {
-        "type": "mouseMoved", "x": sx + dist, "y": sy, "button": "left"})
+        "type": "mouseMoved", "x": sx + dist, "y": sy, "button": "left", "buttons": 1})
     await asyncio.sleep(0.16 + random.uniform(0.0, 0.10))
     await cdp.send("Input.dispatchMouseEvent", {
-        "type": "mouseReleased", "x": sx + dist, "y": sy, "button": "left"})
+        "type": "mouseReleased", "x": sx + dist, "y": sy, "button": "left", "buttons": 0, "clickCount": 1})
 
 async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: int = 180, max_attempts: int = 10) -> dict:
     """End-to-end Aliyun Captcha solver & in-browser account registration."""
@@ -306,6 +333,9 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
 
             print(f"  ⚡ [Attempt #{attempt}] Gap: {g.get('gap_x')}px ({g.get('method')}) -> Target drag: {dist:.1f}px")
 
+            # Natural human reaction pause to locate puzzle hole
+            await asyncio.sleep(random.uniform(1.2, 1.8))
+
             await _human_drag(cdp, slider, dist)
 
             # Check verdict (fast polling 100ms)
@@ -429,7 +459,7 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
                 const btn = document.getElementById('aliyunCaptcha-btn-refresh');
                 if (btn) btn.click();
             }""")
-            await page.wait_for_timeout(1500)
+            await page.wait_for_timeout(random.randint(2200, 3000))
 
         return {
             "solved": False,
