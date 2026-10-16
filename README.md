@@ -16,7 +16,7 @@ Runs **100% standalone** both locally and directly via **GitHub Actions** with a
   - Track boundary clamping (`max_track: 254.0px`) preventing right-wall collisions.
   - Ballistic cubic ease-out overshoot with smooth reverse drift.
 - **Pure HTTP OTP Flow**: Fast polling via Mazdoor temporary email API with direct HTTP activation.
-- **Auto-Commit & Artifact Sync**: GitHub Actions workflow automatically persists newly created accounts directly into the repository (`output/accounts.json`, `output/accounts.txt`, `output/tokens.txt`) and uploads artifact zips.
+- **Auto-Commit & Artifact Sync**: GitHub Actions workflow automatically persists newly created accounts directly into the repository (`output/accounts.json`, `output/accounts.txt`) and uploads artifact zips.
 - **Incremental Deduplication**: Preserves all previously generated accounts across workflow runs without duplicates.
 
 ---
@@ -37,8 +37,7 @@ Runs **100% standalone** both locally and directly via **GitHub Actions** with a
 │   └── browser_helpers.py        # Stealth helper utilities
 ├── output/
 │   ├── accounts.json             # Structured JSON list of all created accounts
-│   ├── accounts.txt              # Formatted credentials (email:password)
-│   └── tokens.txt                # Raw access tokens
+│   └── accounts.txt              # Formatted credentials (email:password)
 ├── main.py                       # CLI orchestrator & batch manager
 ├── mazdoor.py                    # Mazdoor Temporary Mail API client
 ├── config.py                     # Central configuration & URLs
@@ -60,7 +59,7 @@ Runs **100% standalone** both locally and directly via **GitHub Actions** with a
 5. Click the green **Run workflow** button.
 
 Once complete:
-- The generated accounts are automatically **committed and pushed** to `output/accounts.json`, `output/accounts.txt`, and `output/tokens.txt`.
+- The generated accounts are automatically **committed and pushed** to `output/accounts.json` and `output/accounts.txt`.
 - You can also download the ZIP artifact (`qwen-accounts-<run_id>`) directly from the workflow summary.
 
 ---
@@ -112,13 +111,6 @@ All credentials are saved automatically in the `output/` directory:
 adaptivesummit91@simulacrumcanvas.mazdoor.me:Password123
 airtadsmith30@woolanaunter.mazdoor.me:Password123
 adsheartalundum97@mangroveallopath.mazdoor.me:Password123
-```
-
-### 3. `output/tokens.txt`
-```text
-eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSI...
-eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSI...
-eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSI...
 ```
 
 ---

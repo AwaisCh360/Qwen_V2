@@ -69,7 +69,6 @@ jobs:
           prev_json = Path('/tmp/prev_accounts/accounts.json')
           out_json = Path('output/accounts.json')
           out_txt = Path('output/accounts.txt')
-          tokens_txt = Path('output/tokens.txt')
 
           out_json.parent.mkdir(parents=True, exist_ok=True)
           curr_data = json.loads(out_json.read_text()) if (out_json.exists() and out_json.stat().st_size > 0) else []
@@ -92,19 +91,14 @@ jobs:
               except Exception as e:
                   print(f'Merge warning: {e}')
 
-          # Re-sync accounts.txt and tokens.txt from json
+          # Re-sync accounts.txt from json
           txt_lines = []
-          tok_lines = []
           for a in curr_data:
               em = a.get('qwenEmail') or a.get('email')
               pw = a.get('qwenPassword') or 'Password123'
-              tok = a.get('token')
               if em and pw:
                   txt_lines.append(f'{em}:{pw}')
-              if tok:
-                  tok_lines.append(tok)
           out_txt.write_text('\n'.join(txt_lines) + '\n')
-          tokens_txt.write_text('\n'.join(tok_lines) + '\n')
           "
 
       - name: Run Qwen HTTP Account Maker
@@ -119,7 +113,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add output/accounts.json output/accounts.txt output/tokens.txt || true
+          git add output/accounts.json output/accounts.txt || true
           if git diff --staged --quiet; then
             echo "No new accounts to commit."
           else
@@ -136,6 +130,5 @@ jobs:
           path: |
             output/accounts.json
             output/accounts.txt
-            output/tokens.txt
           if-no-files-found: warn
           retention-days: 14

@@ -233,21 +233,8 @@ def save_account(
     lines.append(f"{email}:{password}")
     config.ACCOUNTS_TXT.write_text("\n".join(lines) + "\n")
 
-    # Append to tokens.txt
-    tokens_txt = config.OUTPUT_DIR / "tokens.txt"
-    token_lines = []
-    if tokens_txt.exists():
-        try:
-            token_lines = [l.strip() for l in tokens_txt.read_text().splitlines() if l.strip()]
-        except Exception:
-            token_lines = []
-    if clean_token not in token_lines:
-        token_lines.append(clean_token)
-        tokens_txt.write_text("\n".join(token_lines) + "\n")
-
     print(f"{C_GREEN}💾 Account #{account_num} ({full_name}) saved to: {config.ACCOUNTS_JSON}{C_RESET}")
     print(f"{C_GREEN}💾 Credentials appended to: {config.ACCOUNTS_TXT}{C_RESET}")
-    print(f"{C_GREEN}💾 Token appended to: {tokens_txt}{C_RESET}")
     return True
 
 def verify_token_details(token: str) -> dict:
