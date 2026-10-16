@@ -17,7 +17,8 @@ SOLVER_HEALTH = f"{SOLVER_HOST}/health"
 
 # Mazdoor Mail Service
 MAZDOOR_BASE_URL = os.getenv("MAZDOOR_BASE_URL", "https://berozgaar.mazdoor.me/api")
-MAZDOOR_API_KEY = os.getenv("MAZDOOR_API_KEY", "tk_0a65841dd0a074510cc79e8c16ee3ca18e9fe5a4d5f95634")
+_env_key = os.getenv("MAZDOOR_API_KEY", "").strip()
+MAZDOOR_API_KEY = _env_key if _env_key else "tk_0a65841dd0a074510cc79e8c16ee3ca18e9fe5a4d5f95634"
 
 # Qwen Endpoints
 QWEN_REGISTER_URL = "https://chat.qwen.ai/auth?mode=register"

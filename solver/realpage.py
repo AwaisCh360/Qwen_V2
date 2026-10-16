@@ -124,7 +124,11 @@ async def _human_drag(page, cdp, slider: dict, dist: float, target_px: float):
 async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: int = 180, max_attempts: int = 10) -> dict:
     """End-to-end Aliyun Captcha solver & in-browser account registration."""
     t_start = time.monotonic()
-    browser = await launch_async(headless=True, humanize=False)
+    browser = await launch_async(
+        headless=True,
+        humanize=False,
+        args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+    )
 
     try:
         ctx = await browser.new_context()

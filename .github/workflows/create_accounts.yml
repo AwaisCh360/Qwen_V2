@@ -17,6 +17,7 @@ on:
 jobs:
   create-accounts:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout Code
@@ -37,6 +38,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          python -m playwright install-deps
 
       - name: Install CloakBrowser Chromium
         run: |
@@ -44,7 +46,8 @@ jobs:
 
       - name: Run Qwen HTTP Account Maker
         env:
-          MAZDOOR_API_KEY: ${{ secrets.MAZDOOR_API_KEY }}
+          PYTHONUNBUFFERED: "1"
+          MAZDOOR_API_KEY: ${{ secrets.MAZDOOR_API_KEY || 'tk_0a65841dd0a074510cc79e8c16ee3ca18e9fe5a4d5f95634' }}
         run: |
           xvfb-run -a python main.py --count ${{ github.event.inputs.count }} --delay ${{ github.event.inputs.delay }}
 
@@ -56,4 +59,6 @@ jobs:
           path: |
             output/accounts.json
             output/accounts.txt
+            output/tokens.txt
+          if-no-files-found: warn
           retention-days: 14
