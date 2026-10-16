@@ -74,12 +74,19 @@ _HOOK_JS = r"""
 
 async def _human_drag(cdp, slider: dict, dist: float):
     """Exact kinematics proven in solve.py (3/3 T001) - natural ballistic overshoot + smooth drift back."""
+    max_track = 252.0
+    dist = max(10.0, min(max_track, dist))
+
     sx, sy = slider["x"], slider["y"]
     await cdp.send("Input.dispatchMouseEvent", {
         "type": "mousePressed", "x": sx, "y": sy, "button": "left", "clickCount": 1})
     await asyncio.sleep(random.uniform(0.06, 0.10))
 
-    over = dist + random.uniform(6.0, 11.0)
+    # Cap overshoot so mouse never clips beyond slider track boundary (~252px)
+    overshoot_amt = random.uniform(5.0, 9.0)
+    if dist + overshoot_amt > max_track:
+        overshoot_amt = max(0.5, max_track - dist)
+    over = min(max_track, dist + overshoot_amt)
     n = 42
     for i in range(1, n + 1):
         t = i / n
@@ -185,6 +192,9 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
                         res_dict = j["Result"]
                         if res_dict.get("VerifyResult") is False:
                             attempt_failed["v"] = True
+                            f_code = res_dict.get("VerifyCode") or res_dict.get("Code") or ""
+                            if f_code:
+                                print(f"    ⚠ Aliyun rejected attempt ({f_code})")
                         elif res_dict.get("VerifyResult") is True:
                             verify_success["v"] = res_dict
                 except Exception:
