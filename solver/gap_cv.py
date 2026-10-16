@@ -29,13 +29,38 @@ def detect_gap_x(back_bytes: bytes, shadow_bytes: bytes) -> dict:
     1. YOLO ONNX (high accuracy trained detector)
     2. cv2 Sobel-x template matching (fallback)
     """
-    # Stage 1: YOLO ONNX
+    # Stage 1: YOLO ONNX with Sobel contour refinement
     try:
         from .gap_yolo import detect_gap_yolo
         y = detect_gap_yolo(back_bytes, shadow_bytes)
         if y is not None:
             geo = _piece_geometry(shadow_bytes)
             if geo:
+                # Refine YOLO gap using cv2 Sobel template match within ±18px window
+                try:
+                    back = cv2.imdecode(np.frombuffer(back_bytes, np.uint8), cv2.IMREAD_COLOR)
+                    if back is not None:
+                        gray = cv2.cvtColor(back, cv2.COLOR_BGR2GRAY)
+                        gx = np.abs(cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3))
+                        y0, y1, x0, pw = geo["y0"], geo["y1"], geo["x0"], geo["pw"]
+                        alpha = geo["alpha"]
+                        shp = _piece_band(alpha, y0, y1, x0, x0 + pw)
+                        tgx = np.abs(cv2.Sobel(shp, cv2.CV_32F, 1, 0, ksize=3))
+                        band = gx[y0:y1 + 1, :].astype(np.float32)
+
+                        res = cv2.matchTemplate(band, tgx, cv2.TM_CCOEFF_NORMED)
+                        yolo_x = y["gap_x"]
+                        win_min = max(0, yolo_x - 18)
+                        win_max = min(res.shape[1], yolo_x + 18)
+                        sub_res = res[:, win_min:win_max]
+                        _, maxv, _, maxloc = cv2.minMaxLoc(sub_res)
+                        if maxv > 0.25:
+                            refined_x = win_min + maxloc[0]
+                            y["gap_x"] = refined_x
+                            y["method"] = "yolo+sobel"
+                except Exception:
+                    pass
+
                 y.setdefault("piece_x0", geo["x0"])
                 y["piece_w"] = geo["pw"]
                 y["slide_dist"] = y["gap_x"] - geo["x0"]

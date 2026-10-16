@@ -304,10 +304,17 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
 
             target = g["gap_x"] * scale
             dist = float(_invert(target))
+
+            # Adaptive micro-calibration: on retries, sweep within the ±2px tolerance window
+            calibrations = [0.0, -1.2, 1.2, -2.4, 2.4]
+            cal_offset = calibrations[(attempt - 1) % len(calibrations)]
+            dist += cal_offset
+
             if dist < 10.0:
                 dist = 50.0
 
-            print(f"  ⚡ [Attempt #{attempt}] Gap: {g.get('gap_x')}px ({g.get('method')}) -> Target drag: {dist:.1f}px")
+            cal_str = f" ({cal_offset:+.1f}px cal)" if cal_offset != 0 else ""
+            print(f"  ⚡ [Attempt #{attempt}] Gap: {g.get('gap_x')}px ({g.get('method')}) -> Target drag: {dist:.1f}px{cal_str}")
 
             await _human_drag(cdp, slider, dist)
 
