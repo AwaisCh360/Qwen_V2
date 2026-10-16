@@ -1,0 +1,30 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Output files with generated credentials (DO NOT COMMIT)
+output/*.json
+output/*.txt
+!output/.gitkeep
+
+# Environment variables & secrets
+.env
+.env.local
+
+# Operating System & Scratch files
+.DS_Store
+Thumbs.db
+scratch/
+*.log
+
+# IDE configuration
+.idea/
+.vscode/
+*.swp

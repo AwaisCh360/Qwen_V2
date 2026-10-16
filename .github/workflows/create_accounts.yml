@@ -1,0 +1,59 @@
+name: Create Qwen Accounts
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: 'Number of accounts to create'
+        required: true
+        default: '3'
+        type: string
+      delay:
+        description: 'Delay (seconds) between accounts'
+        required: true
+        default: '5'
+        type: string
+
+jobs:
+  create-accounts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libglib2.0-0 xvfb
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install CloakBrowser Chromium
+        run: |
+          python -m cloakbrowser install
+
+      - name: Run Qwen HTTP Account Maker
+        env:
+          MAZDOOR_API_KEY: ${{ secrets.MAZDOOR_API_KEY }}
+        run: |
+          xvfb-run -a python main.py --count ${{ github.event.inputs.count }} --delay ${{ github.event.inputs.delay }}
+
+      - name: Upload Generated Accounts Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qwen-accounts-${{ github.run_id }}
+          path: |
+            output/accounts.json
+            output/accounts.txt
+          retention-days: 14
