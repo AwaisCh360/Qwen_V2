@@ -72,54 +72,44 @@ _HOOK_JS = r"""
 })();
 """
 
-async def _human_drag(page, cdp, slider: dict, dist: float, target_px: float):
-    """Natural single-arc ballistic overshoot drag with live DOM feedback fine-tuning."""
+async def _human_drag(cdp, slider: dict, dist: float):
+    """Exact kinematics proven in solve.py (3/3 T001) - natural ballistic overshoot + smooth drift back."""
     sx, sy = slider["x"], slider["y"]
     await cdp.send("Input.dispatchMouseEvent", {
         "type": "mousePressed", "x": sx, "y": sy, "button": "left", "clickCount": 1})
     await asyncio.sleep(random.uniform(0.06, 0.10))
 
-    over = dist + random.uniform(4.0, 7.0)
-    n = 30
+    over = dist + random.uniform(6.0, 11.0)
+    n = 42
     for i in range(1, n + 1):
         t = i / n
         ease = 1.0 - (1.0 - t) ** 3
-        cx = sx + over * ease
-        cy = sy + np.sin(t * np.pi) * 1.0 + random.uniform(-0.3, 0.3)
         await cdp.send("Input.dispatchMouseEvent", {
-            "type": "mouseMoved", "x": cx, "y": cy, "button": "left"})
-        await asyncio.sleep(0.012 + (i % 3) * 0.003)
+            "type": "mouseMoved",
+            "x": sx + over * ease,
+            "y": sy + np.sin(t * 5.0) * 1.2,
+            "button": "left"
+        })
+        await asyncio.sleep(0.011 + (i % 4) * 0.004)
 
-    # Correction phase
-    cn = 8
+    # Correction phase: drift smoothly back to target
+    cn = 10
     for j in range(1, cn + 1):
         t = j / cn
         cur = over + (dist - over) * t
-        cy = sy + random.uniform(-0.3, 0.3)
         await cdp.send("Input.dispatchMouseEvent", {
-            "type": "mouseMoved", "x": sx + cur, "y": cy, "button": "left"})
-        await asyncio.sleep(0.015 + random.uniform(0.0, 0.008))
+            "type": "mouseMoved",
+            "x": sx + cur,
+            "y": sy + random.uniform(-0.6, 0.6),
+            "button": "left"
+        })
+        await asyncio.sleep(0.02 + random.uniform(0.0, 0.015))
 
-    # Live DOM piece feedback fine-tuning
-    cur_x = sx + dist
-    for _ in range(15):
-        try:
-            cur_pz = await page.evaluate(
-                "() => parseFloat(document.querySelector('#aliyunCaptcha-puzzle')?.style.left) || 0"
-            )
-            diff = target_px - cur_pz
-            if abs(diff) <= 1.0:
-                break
-            cur_x = cur_x + diff * 0.85
-            await cdp.send("Input.dispatchMouseEvent", {
-                "type": "mouseMoved", "x": cur_x, "y": sy + random.uniform(-0.3, 0.3), "button": "left"})
-            await asyncio.sleep(0.025)
-        except Exception:
-            break
-
-    await asyncio.sleep(0.12 + random.uniform(0.0, 0.05))
     await cdp.send("Input.dispatchMouseEvent", {
-        "type": "mouseReleased", "x": cur_x, "y": sy, "button": "left"})
+        "type": "mouseMoved", "x": sx + dist, "y": sy, "button": "left"})
+    await asyncio.sleep(0.16 + random.uniform(0.0, 0.10))
+    await cdp.send("Input.dispatchMouseEvent", {
+        "type": "mouseReleased", "x": sx + dist, "y": sy, "button": "left"})
 
 async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: int = 180, max_attempts: int = 10) -> dict:
     """End-to-end Aliyun Captcha solver & in-browser account registration."""
@@ -285,19 +275,38 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
 
             # Detect puzzle gap and calculate target drag distance
             g = detect_gap_x(back_b, piece_b)
-            geo = await page.evaluate("""() => {
-                const bg = document.getElementById('aliyunCaptcha-img');
-                return bg && bg.naturalWidth > 0 ? {
-                    w: bg.getBoundingClientRect().width,
-                    natW: bg.naturalWidth
-                } : { w: 300, natW: 296 };
-            }""")
+            geo = None
+            for _ in range(20):
+                geo = await page.evaluate("""() => {
+                    const bg = document.getElementById('aliyunCaptcha-img');
+                    if (!bg) return null;
+                    const r = bg.getBoundingClientRect();
+                    const w = r.width;
+                    const natW = bg.naturalWidth;
+                    if (w > 50 && natW > 50) {
+                        return { w, natW };
+                    }
+                    return null;
+                }""")
+                if geo:
+                    break
+                await page.wait_for_timeout(80)
+
+            if not geo:
+                geo = {"w": 300, "natW": 296}
+
             scale = geo["w"] / geo["natW"]
+            if scale < 0.8 or scale > 1.3:
+                scale = 300.0 / 296.0
+
             target = g["gap_x"] * scale
             dist = float(_invert(target))
+            if dist < 10.0:
+                dist = 50.0
+
             print(f"  ⚡ [Attempt #{attempt}] Gap: {g.get('gap_x')}px ({g.get('method')}) -> Target drag: {dist:.1f}px")
 
-            await _human_drag(page, cdp, slider, dist, target)
+            await _human_drag(cdp, slider, dist)
 
             # Check verdict (fast polling 100ms)
             R = None
@@ -415,13 +424,12 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
                 }""")
                 log.warning(f"Aliyun passed on attempt {attempt} but OTP screen did not mount. Alert: {toast_err}")
 
-            # Refresh slider for next attempt
             images.clear()
             await page.evaluate("""() => {
                 const btn = document.getElementById('aliyunCaptcha-btn-refresh');
                 if (btn) btn.click();
             }""")
-            await page.wait_for_timeout(500)
+            await page.wait_for_timeout(1500)
 
         return {
             "solved": False,
