@@ -6,12 +6,12 @@ on:
       count:
         description: 'Number of accounts to create'
         required: true
-        default: '1'
+        default: '3'
         type: string
       delay:
         description: 'Delay (seconds) between accounts'
         required: true
-        default: '15'
+        default: '5'
         type: string
 
 permissions:

@@ -185,9 +185,6 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
                         res_dict = j["Result"]
                         if res_dict.get("VerifyResult") is False:
                             attempt_failed["v"] = True
-                            f_code = res_dict.get("VerifyCode") or res_dict.get("Code") or ""
-                            if f_code:
-                                print(f"    ⚠ Aliyun rejected attempt ({f_code})")
                         elif res_dict.get("VerifyResult") is True:
                             verify_success["v"] = res_dict
                 except Exception:
@@ -304,17 +301,10 @@ async def solve_qwen_registration(url: str, email: str, mail=None, timeout_s: in
 
             target = g["gap_x"] * scale
             dist = float(_invert(target))
-
-            # Adaptive micro-calibration: on retries, sweep within the ±2px tolerance window
-            calibrations = [0.0, -1.2, 1.2, -2.4, 2.4]
-            cal_offset = calibrations[(attempt - 1) % len(calibrations)]
-            dist += cal_offset
-
             if dist < 10.0:
                 dist = 50.0
 
-            cal_str = f" ({cal_offset:+.1f}px cal)" if cal_offset != 0 else ""
-            print(f"  ⚡ [Attempt #{attempt}] Gap: {g.get('gap_x')}px ({g.get('method')}) -> Target drag: {dist:.1f}px{cal_str}")
+            print(f"  ⚡ [Attempt #{attempt}] Gap: {g.get('gap_x')}px ({g.get('method')}) -> Target drag: {dist:.1f}px")
 
             await _human_drag(cdp, slider, dist)
 
