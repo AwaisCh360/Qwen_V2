@@ -1,69 +1,71 @@
-# ⚡ Qwen HTTP Account Maker (GitHub Actions & Local)
+# ⚡ Qwen HTTP Account Maker (V2)
 
-Automated, API-driven Qwen account generator with automated Aliyun slider CAPTCHA solving, Mazdoor temporary mail integration, and pure HTTP OTP verification.
+High-speed, automated Qwen account maker powered by Mazdoor Temporary Mail API, YOLOv8n ONNX gap detector, and natural ballistic kinematic puzzle slider solver.
 
-Designed to run **100% standalone** both locally and directly via **GitHub Actions**.
+Runs **100% standalone** both locally and directly via **GitHub Actions** with automated Git persistence.
 
 ---
 
 ## 🌟 Key Features
-- **GitHub Actions Ready:** Run directly in the cloud on GitHub runners without hosting any server.
-- **Pure HTTP Account Flow:** Email creation, OTP polling, and token verification happen via high-speed HTTP requests.
-- **Embedded Slider Solver:** Includes an embedded real-page CloakBrowser slider solver with Sobel-x template matching.
-- **Artifact Export:** Automatically packages created accounts into downloadable GitHub Actions artifacts (`accounts.json` & `accounts.txt`).
-- **Resilient Retry:** Auto-retries with fresh inboxes if email delivery or challenge encounters transient latency.
+
+- **Embedded YOLOv8n ONNX Gap Detector**: Ultra-fast (15–30ms) CPU neural network inference (`best.onnx`) with thread optimization.
+- **Natural Human Kinematic Solver**:
+  - Realistic human reaction delay (`1.2s – 1.8s`) before touching puzzle.
+  - Organic screen-to-slider approach movement (eliminates teleportation bot flags).
+  - Proper Chrome DevTools Protocol pointer button states (`buttons: 1`).
+  - Track boundary clamping (`max_track: 254.0px`) preventing right-wall collisions.
+  - Ballistic cubic ease-out overshoot with smooth reverse drift.
+- **Pure HTTP OTP Flow**: Fast polling via Mazdoor temporary email API with direct HTTP activation.
+- **Auto-Commit & Artifact Sync**: GitHub Actions workflow automatically persists newly created accounts directly into the repository (`output/accounts.json`, `output/accounts.txt`, `output/tokens.txt`) and uploads artifact zips.
+- **Incremental Deduplication**: Preserves all previously generated accounts across workflow runs without duplicates.
 
 ---
 
 ## 📁 Repository Structure
+
 ```text
-qwen-http-maker/
+.
 ├── .github/
 │   └── workflows/
-│       └── create_accounts.yml   # GitHub Actions workflow (dispatch & runner)
+│       └── create_accounts.yml   # GitHub Actions automated workflow with auto-commit
 ├── solver/
 │   ├── __init__.py
-│   ├── realpage.py               # Aliyun real-page slider automation engine
-│   ├── gap_cv.py                 # Pure Sobel-x gradient gap detector
-│   └── browser_helpers.py        # Playwright/CDP action helpers
-├── main.py                       # Main CLI entrypoint (Single & batch mode)
+│   ├── best.onnx                 # Trained YOLOv8n ONNX puzzle gap detection model
+│   ├── gap_yolo.py               # ONNX Runtime CPU inference engine (thread-limited)
+│   ├── gap_cv.py                 # Hybrid gap detection wrapper
+│   ├── realpage.py               # Aliyun Captcha 2.0 real-page solver & human kinematics
+│   └── browser_helpers.py        # Stealth helper utilities
+├── output/
+│   ├── accounts.json             # Structured JSON list of all created accounts
+│   ├── accounts.txt              # Formatted credentials (email:password)
+│   └── tokens.txt                # Raw access tokens
+├── main.py                       # CLI orchestrator & batch manager
 ├── mazdoor.py                    # Mazdoor Temporary Mail API client
-├── config.py                     # Central configuration & endpoints
-├── requirements.txt              # Minimal Python dependencies
-├── run.sh                        # Local 1-click execution script
-├── .gitignore                    # Keeps credentials & cache safe
+├── config.py                     # Central configuration & URLs
+├── requirements.txt              # Python dependencies
+├── run.sh                        # Local runner script
 └── README.md                     # Documentation
 ```
 
 ---
 
-## 🚀 How to Run on GitHub Actions
+## 🚀 Running via GitHub Actions
 
-1. **Push this repository to GitHub:**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit of Qwen HTTP Account Maker"
-   git branch -M main
-   git remote add origin https://github.com/<YOUR_USERNAME>/<REPO_NAME>.git
-   git push -u origin main
-   ```
+1. Go to your repository on GitHub (`git@github.com:AwaisCh360/Qwen_V2.git`).
+2. Navigate to the **Actions** tab.
+3. Select **Create Qwen Accounts** workflow from the sidebar.
+4. Click **Run workflow**:
+   - **`count`**: Number of accounts to create (e.g. `3`).
+   - **`delay`**: Delay in seconds between accounts (e.g. `5`).
+5. Click the green **Run workflow** button.
 
-2. **Run the Workflow:**
-   - Go to your repository on GitHub.
-   - Click on the **Actions** tab.
-   - Select **Create Qwen Accounts** from the left sidebar.
-   - Click the **Run workflow** dropdown button.
-   - Enter how many accounts to create (e.g. `3` or `5`) and click **Run workflow**.
-
-3. **Download Accounts:**
-   - Once the action run finishes, click on the completed run.
-   - Scroll down to the **Artifacts** section at the bottom of the summary page.
-   - Click to download **`qwen-accounts-<run_id>`** (contains `accounts.json` and `accounts.txt`).
+Once complete:
+- The generated accounts are automatically **committed and pushed** to `output/accounts.json`, `output/accounts.txt`, and `output/tokens.txt`.
+- You can also download the ZIP artifact (`qwen-accounts-<run_id>`) directly from the workflow summary.
 
 ---
 
-## 💻 How to Run Locally
+## 💻 Running Locally
 
 ### Requirements
 - Python 3.10+
@@ -75,39 +77,57 @@ qwen-http-maker/
 pip install -r requirements.txt
 python -m cloakbrowser install
 
-# 2. Run Single Account Creation
+# 2. Run single account creation
 ./run.sh
 
-# 3. Run Batch Mode (e.g. 5 accounts)
-./run.sh --count 5 --delay 5
+# 3. Run batch creation (e.g. 3 accounts with 5s delay)
+./run.sh --count 3 --delay 5
 ```
 
 ---
 
 ## 💾 Output Formats
 
-All generated credentials are saved into `output/`:
+All credentials are saved automatically in the `output/` directory:
 
-### `output/accounts.json`
+### 1. `output/accounts.json`
 ```json
 [
   {
-    "email": "user@mazdoor.me",
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "authorization": "Bearer eyJhbGci...",
-    "cookies": { ... },
-    "status": "success",
-    "created_at": "2026-10-16 12:00:00"
+    "accountNumber": 1,
+    "fullName": "Judith Cruz",
+    "qwenEmail": "adaptivesummit91@simulacrumcanvas.mazdoor.me",
+    "qwenPassword": "Password123",
+    "etempRecoverKey": "WKLBZOX9218412",
+    "activationLink": null,
+    "createdAt": "2026-10-16T17:15:23.000Z",
+    "status": "activated",
+    "token": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSI..."
   }
 ]
 ```
 
-### `output/accounts.txt`
+### 2. `output/accounts.txt`
 ```text
-user@mazdoor.me:eyJhbGciOiJIUzI1NiIs...
+adaptivesummit91@simulacrumcanvas.mazdoor.me:Password123
+airtadsmith30@woolanaunter.mazdoor.me:Password123
+adsheartalundum97@mangroveallopath.mazdoor.me:Password123
+```
+
+### 3. `output/tokens.txt`
+```text
+eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSI...
+eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSI...
+eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSI...
 ```
 
 ---
 
-## 🛡️ Privacy & Safety
-The repository is pre-configured with a strict `.gitignore` that prevents any created accounts or tokens in `output/*.json` and `output/*.txt` from ever being committed to GitHub.
+## ⚡ Technical Highlights
+
+| Component | Technology | Performance |
+| :--- | :--- | :--- |
+| **Vision Model** | YOLOv8n ONNX (`best.onnx`) | 15–30ms gap detection |
+| **Kinematics Engine** | Ballistic Cubic Ease-Out + Reverse Drift | Passed Aliyun `T001` Heuristics |
+| **Temporary Mail** | Mazdoor API (`mazdoor.me`) | 3–6s OTP delivery |
+| **Browser Layer** | CloakBrowser Headless | Undetected Canvas & Fingerprints |
