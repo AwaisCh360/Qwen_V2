@@ -14,6 +14,10 @@ on:
         default: '5'
         type: string
 
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   create-accounts:
     runs-on: ubuntu-latest
@@ -22,6 +26,9 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -44,12 +51,82 @@ jobs:
         run: |
           python -m cloakbrowser install
 
+      - name: Sync Artifact from Run 38916951681
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: qwen-accounts-38916951681
+          run-id: 38916951681
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/prev_accounts
+
+      - name: Merge Previous Artifact Accounts
+        run: |
+          python -c "
+          import json
+          from pathlib import Path
+
+          prev_json = Path('/tmp/prev_accounts/accounts.json')
+          out_json = Path('output/accounts.json')
+          out_txt = Path('output/accounts.txt')
+          tokens_txt = Path('output/tokens.txt')
+
+          out_json.parent.mkdir(parents=True, exist_ok=True)
+          curr_data = json.loads(out_json.read_text()) if (out_json.exists() and out_json.stat().st_size > 0) else []
+          known_emails = {a.get('qwenEmail') or a.get('email') for a in curr_data}
+
+          if prev_json.exists():
+              try:
+                  prev_data = json.loads(prev_json.read_text())
+                  added = 0
+                  for item in prev_data:
+                      em = item.get('qwenEmail') or item.get('email')
+                      if em and em not in known_emails and item.get('token'):
+                          item['accountNumber'] = len(curr_data) + 1
+                          curr_data.append(item)
+                          known_emails.add(em)
+                          added += 1
+                  if added > 0:
+                      out_json.write_text(json.dumps(curr_data, indent=2))
+                      print(f'Successfully merged {added} accounts from previous run.')
+              except Exception as e:
+                  print(f'Merge warning: {e}')
+
+          # Re-sync accounts.txt and tokens.txt from json
+          txt_lines = []
+          tok_lines = []
+          for a in curr_data:
+              em = a.get('qwenEmail') or a.get('email')
+              pw = a.get('qwenPassword') or 'Password123'
+              tok = a.get('token')
+              if em and pw:
+                  txt_lines.append(f'{em}:{pw}')
+              if tok:
+                  tok_lines.append(tok)
+          out_txt.write_text('\n'.join(txt_lines) + '\n')
+          tokens_txt.write_text('\n'.join(tok_lines) + '\n')
+          "
+
       - name: Run Qwen HTTP Account Maker
         env:
           PYTHONUNBUFFERED: "1"
           MAZDOOR_API_KEY: ${{ secrets.MAZDOOR_API_KEY || 'tk_0a65841dd0a074510cc79e8c16ee3ca18e9fe5a4d5f95634' }}
         run: |
           xvfb-run -a python main.py --count ${{ github.event.inputs.count }} --delay ${{ github.event.inputs.delay }}
+
+      - name: Commit and Push Generated Accounts to Repository
+        if: always()
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/accounts.json output/accounts.txt output/tokens.txt || true
+          if git diff --staged --quiet; then
+            echo "No new accounts to commit."
+          else
+            git commit -m "chore(accounts): save generated accounts [skip ci]"
+            git pull --rebase origin main || true
+            git push origin main
+          fi
 
       - name: Upload Generated Accounts Artifact
         uses: actions/upload-artifact@v4

@@ -9,11 +9,6 @@ venv/
 env/
 ENV/
 
-# Output files with generated credentials (DO NOT COMMIT)
-output/*.json
-output/*.txt
-!output/.gitkeep
-
 # Environment variables & secrets
 .env
 .env.local
