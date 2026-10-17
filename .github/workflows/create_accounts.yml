@@ -49,7 +49,7 @@ jobs:
 
       - name: Install CloakBrowser Chromium
         run: |
-          python -m cloakbrowser install
+          python -m cloakbrowser install || true
 
 
       - name: Configure Git Identity
