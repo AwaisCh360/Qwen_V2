@@ -4,14 +4,18 @@ Standardizes account passwords to Stronghold1236# via the official reset flow:
    - If an account is already marked 'passwordVerified', it is skipped immediately (0s).
    - Only accounts whose password is not yet set or verified are processed.
 2. High-Speed Browser Reset Flow (~12-15s per account):
-   - Reuses a persistent shared CloakBrowser instance across the entire batch.
+   - Browser Recycling: Automatically launches a clean CloakBrowser session every 5 accounts
+     and immediately upon any error to eliminate Aliyun risk score build-up and DOM exhaustion.
    - Takes a snapshot of existing inbox messages so old expired links are never processed.
    - Triggers 'Forget password' on chat.qwen.ai with proactive DOM splash-screen removal.
    - Solves Aliyun puzzle captcha via CV gap detection & ballistic drag with automatic retry.
-   - Polls inbox strictly for brand new incoming reset links.
+   - If captcha is rejected or fails, skips polling to save time and recycles session.
+   - Polls inbox strictly for brand new incoming reset links (Mazdoor & Maxxspace/Mail.tm).
    - Opens the reset page in the browser context, fills Stronghold1236#, and submits.
    - Confirms password update on Qwen backend.
-   - Sets 'passwordVerified': True and immediately saves to output/accounts.json and output/accounts.txt.
+3. Real-Time Live Persistence & Git Sync:
+   - Immediately saves to output/accounts.json and output/accounts.txt upon each success.
+   - Real-time Git Commit & Push on every verified account, preventing any lost progress.
 """
 import argparse
 import asyncio
@@ -24,6 +28,7 @@ import re
 import sys
 import time
 import os
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -53,6 +58,9 @@ ACCOUNTS_TXT = BASE_DIR / "output" / "accounts.txt"
 TARGET_PASSWORD = "Stronghold1236#"
 TARGET_PASSWORD_HASH = hashlib.sha256(TARGET_PASSWORD.encode()).hexdigest()
 MAZDOOR_API_KEY = os.getenv("MAZDOOR_API_KEY", "tk_0a65841dd0a074510cc79e8c16ee3ca18e9fe5a4d5f95634").strip()
+
+# Browser session recycling interval (accounts per session)
+RECYCLE_INTERVAL = 5
 
 _COEF = (0.00355, 0.0769, -0.004)
 
@@ -114,6 +122,26 @@ async def _human_drag(cdp, slider: dict, dist: float):
 
     await asyncio.sleep(random.uniform(0.06, 0.10))
     await cdp.send("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": tx, "y": sy, "button": "left", "buttons": 0, "clickCount": 1})
+
+
+def live_git_sync(action_desc: str = "update verified accounts"):
+    """Live atomic commit and push to git repository so no progress is lost if workflow stops."""
+    try:
+        subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "add", "output/accounts.json", "output/accounts.txt"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        diff_res = subprocess.run(["git", "diff", "--staged", "--quiet"], check=False)
+        if diff_res.returncode != 0:
+            msg = f"chore(accounts): live sync {action_desc} [skip ci]"
+            subprocess.run(["git", "commit", "-m", msg], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["git", "pull", "--rebase", "origin", "main"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            push_res = subprocess.run(["git", "push", "origin", "main"], check=False, capture_output=True, text=True)
+            if push_res.returncode == 0:
+                log.info("  🚀 [Live Git Sync] Progress saved and pushed to GitHub!")
+            else:
+                log.debug(f"Git push notice: {push_res.stderr.strip()[:100]}")
+    except Exception as e:
+        log.debug(f"Live git sync exception: {e}")
 
 
 def get_inbox_messages_snapshot(email: str, recover_key: str = None) -> set[str]:
@@ -235,6 +263,48 @@ def fetch_fresh_reset_link(email: str, seen_ids: set[str], recover_key: str = No
     return None, None
 
 
+class CloakSessionManager:
+    """Manages browser lifecycle, recycling every RECYCLE_INTERVAL accounts or on failure
+    to eliminate Aliyun anti-bot risk score accumulation.
+    """
+    def __init__(self):
+        self.browser = None
+        self.page = None
+        self.cdp = None
+        self.processed_count = 0
+
+    async def get_session(self, force_refresh: bool = False):
+        if self.browser and not force_refresh and self.processed_count < RECYCLE_INTERVAL:
+            return self.page, self.cdp
+
+        await self.close()
+        log.info("  🔄 Starting fresh CloakBrowser session (anti-bot fingerprint reset)...")
+        self.browser = await launch_async(headless=True)
+        self.page = await self.browser.new_page()
+        self.cdp = await self.page.context.new_cdp_session(self.page)
+        self.processed_count = 0
+        return self.page, self.cdp
+
+    def increment(self):
+        self.processed_count += 1
+
+    async def close(self):
+        if self.page:
+            try:
+                await self.page.close()
+            except Exception:
+                pass
+            self.page = None
+            self.cdp = None
+        if self.browser:
+            try:
+                await self.browser.close()
+            except Exception:
+                pass
+            self.browser = None
+        self.processed_count = 0
+
+
 async def reset_single_account(page, cdp, email: str, recover_key: str = None) -> bool:
     """Full automated password reset flow executed in ~12-15s:
     1. Snapshot inbox message IDs
@@ -264,102 +334,137 @@ async def reset_single_account(page, cdp, email: str, recover_key: str = None) -
             except Exception:
                 pass
 
-    page.on("response", lambda r: asyncio.create_task(on_response(r)))
+    listener = lambda r: asyncio.create_task(on_response(r))
+    page.on("response", listener)
 
-    # Step A: Navigate to /forget
-    await page.goto("https://chat.qwen.ai/forget", wait_until="domcontentloaded", timeout=18000)
-    await page.wait_for_timeout(600)
-    await page.evaluate("() => { const s = document.getElementById('splash-screen'); if (s) s.remove(); }")
+    try:
+        # Step A: Navigate to /forget
+        await page.goto("https://chat.qwen.ai/forget", wait_until="domcontentloaded", timeout=18000)
+        await page.wait_for_timeout(600)
+        await page.evaluate("() => { const s = document.getElementById('splash-screen'); if (s) s.remove(); }")
 
-    email_input = page.locator('input[placeholder*="mail" i], input[type="text"]').first
-    await email_input.wait_for(state="visible", timeout=6000)
-    await email_input.fill(email)
+        email_input = page.locator('input[placeholder*="mail" i], input[type="text"]').first
+        await email_input.wait_for(state="visible", timeout=6000)
+        await email_input.fill(email)
 
-    submit_btn = page.locator("button:has-text(\"Send password reset link\")").first
-    await submit_btn.click(force=True)
-    log.info("  Submitted reset request, waiting for puzzle slider...")
+        submit_btn = page.locator("button:has-text(\"Send password reset link\")").first
+        await submit_btn.click(force=True)
+        log.info("  Submitted reset request, waiting for puzzle slider...")
 
-    # Step B: Solve captcha slider with automatic retry loop
-    for attempt in range(1, 4):
-        slider = None
-        for _ in range(40):
-            slider = await page.evaluate(_FIND_SLIDER_JS)
-            if slider:
-                break
-            await page.wait_for_timeout(100)
+        # Step B: Solve captcha slider with automatic retry loop
+        captcha_passed = False
+        for attempt in range(1, 4):
+            slider = None
+            for _ in range(40):
+                slider = await page.evaluate(_FIND_SLIDER_JS)
+                if slider:
+                    break
+                await page.wait_for_timeout(100)
 
-        if not slider:
-            log.warning(f"  Attempt {attempt}: Captcha slider not found")
-            continue
+            if not slider:
+                log.warning(f"  Attempt {attempt}: Captcha slider not found")
+                if attempt < 3:
+                    try:
+                        submit_btn = page.locator("button:has-text(\"Send password reset link\")").first
+                        if await submit_btn.is_visible():
+                            await submit_btn.click(force=True)
+                            await page.wait_for_timeout(1000)
+                    except Exception:
+                        pass
+                continue
 
-        back_b, piece_b = None, None
-        for _ in range(35):
-            if not back_b:
-                for k, b in list(images.items()):
-                    if len(b) > 10000:
-                        back_b = b
-                        break
-            if not piece_b:
-                for k, b in list(images.items()):
-                    if len(b) < 10000:
-                        piece_b = b
-                        break
-            if back_b and piece_b:
-                break
-            await page.wait_for_timeout(100)
+            back_b, piece_b = None, None
+            for _ in range(35):
+                if not back_b:
+                    for k, b in list(images.items()):
+                        if len(b) > 10000:
+                            back_b = b
+                            break
+                if not piece_b:
+                    for k, b in list(images.items()):
+                        if len(b) < 10000:
+                            piece_b = b
+                            break
+                if back_b and piece_b:
+                    break
+                await page.wait_for_timeout(100)
 
-        if not back_b or not piece_b:
-            log.warning(f"  Attempt {attempt}: Captcha images not yet captured")
-            continue
+            if not back_b or not piece_b:
+                log.warning(f"  Attempt {attempt}: Captcha images not yet captured")
+                continue
 
-        g = detect_gap_x(back_b, piece_b)
-        target = g["gap_x"] * (300.0 / 296.0)
-        dist = float(_invert(target))
-        log.info(f"  Attempt {attempt}: Solving puzzle gap at x={g['gap_x']} (drag dist: {dist:.1f}px)...")
+            g = detect_gap_x(back_b, piece_b)
+            target = g["gap_x"] * (300.0 / 296.0)
+            dist = float(_invert(target))
+            log.info(f"  Attempt {attempt}: Solving puzzle gap at x={g['gap_x']} (drag dist: {dist:.1f}px)...")
 
-        await _human_drag(cdp, slider, dist)
+            await _human_drag(cdp, slider, dist)
 
-        for _ in range(25):
+            for _ in range(30):
+                if reset_dispatched["v"]:
+                    break
+                await page.wait_for_timeout(100)
+
             if reset_dispatched["v"]:
+                log.info("  ✔ Captcha passed! Reset request dispatched by Qwen backend.")
+                captcha_passed = True
                 break
-            await page.wait_for_timeout(100)
 
-        if reset_dispatched["v"]:
-            log.info("  ✔ Captcha passed! Reset request dispatched by Qwen backend.")
-            break
+            log.info("  Slider retry requested by Aliyun. Retrying drag...")
+            images.clear()
+            await page.wait_for_timeout(1200)
 
-        log.info("  Slider retry requested by Aliyun. Retrying drag...")
-        images.clear()
+            # Re-trigger slider if needed
+            refresh_btn = page.locator(".aliyunCaptcha-refresh, #aliyunCaptcha-refresh, [class*='refresh']").first
+            if await refresh_btn.is_visible():
+                await refresh_btn.click(force=True)
+                await page.wait_for_timeout(1000)
+            else:
+                try:
+                    submit_btn = page.locator("button:has-text(\"Send password reset link\")").first
+                    if await submit_btn.is_visible():
+                        await submit_btn.click(force=True)
+                        await page.wait_for_timeout(1000)
+                except Exception:
+                    pass
+
+        if not captcha_passed:
+            log.warning("  ❌ Captcha was not solved. Skipping email polling to save time.")
+            return False
+
+        # Step C: Poll inbox for fresh reset email
+        reset_id, reset_token = fetch_fresh_reset_link(email, seen_ids, recover_key, timeout=25)
+        if not reset_id or not reset_token:
+            log.error(f"  ❌ Timed out waiting for fresh reset email for {email}")
+            return False
+
+        log.info(f"  ✔ Fresh reset token acquired: id={reset_id[:8]}... token={reset_token[:10]}...")
+
+        # Step D: Navigate directly to reset page in browser
+        reset_url = f"https://chat.qwen.ai/reset?id={reset_id}&token={reset_token}"
+        log.info("  Navigating to reset page in browser context...")
+        await page.goto(reset_url, wait_until="domcontentloaded", timeout=18000)
         await page.wait_for_timeout(1000)
+        await page.evaluate("() => { const s = document.getElementById('splash-screen'); if (s) s.remove(); }")
 
-    # Step C: Poll inbox for fresh reset email
-    reset_id, reset_token = fetch_fresh_reset_link(email, seen_ids, recover_key, timeout=25)
-    if not reset_id or not reset_token:
-        log.error(f"  ❌ Timed out waiting for fresh reset email for {email}")
-        return False
+        pws = page.locator("input[type=\"password\"]")
+        await pws.first.wait_for(state="visible", timeout=7000)
+        await pws.nth(0).fill(TARGET_PASSWORD)
+        await pws.nth(1).fill(TARGET_PASSWORD)
+        await page.wait_for_timeout(300)
 
-    log.info(f"  ✔ Fresh reset token acquired: id={reset_id[:8]}... token={reset_token[:10]}...")
+        reset_btn = page.locator("button:has-text(\"Reset password\")").first
+        await reset_btn.click(force=True)
+        log.info(f"  Submitted new password ({TARGET_PASSWORD})! Waiting for confirmation...")
 
-    # Step D: Navigate directly to reset page in browser
-    reset_url = f"https://chat.qwen.ai/reset?id={reset_id}&token={reset_token}"
-    log.info("  Navigating to reset page in browser context...")
-    await page.goto(reset_url, wait_until="domcontentloaded", timeout=18000)
-    await page.wait_for_timeout(1000)
-    await page.evaluate("() => { const s = document.getElementById('splash-screen'); if (s) s.remove(); }")
-
-    pws = page.locator("input[type=\"password\"]")
-    await pws.first.wait_for(state="visible", timeout=7000)
-    await pws.nth(0).fill(TARGET_PASSWORD)
-    await pws.nth(1).fill(TARGET_PASSWORD)
-    await page.wait_for_timeout(300)
-
-    reset_btn = page.locator("button:has-text(\"Reset password\")").first
-    await reset_btn.click(force=True)
-    log.info(f"  Submitted new password ({TARGET_PASSWORD})! Waiting for confirmation...")
-
-    await page.wait_for_timeout(2000)
-    log.info(f"  ✔ Password successfully set to {TARGET_PASSWORD} on Qwen backend!")
-    return True
+        await page.wait_for_timeout(2000)
+        log.info(f"  ✔ Password successfully set to {TARGET_PASSWORD} on Qwen backend!")
+        return True
+    finally:
+        try:
+            page.remove_listener("response", listener)
+        except Exception:
+            pass
 
 
 async def run_password_setter(accounts: list, target_indices: list, delay: float = 1.0, force: bool = False):
@@ -371,11 +476,11 @@ async def run_password_setter(accounts: list, target_indices: list, delay: float
     log.info(f"\n=======================================================")
     log.info(f"HIGH-SPEED PASSWORD SETTER: Processing {len(target_indices)} Accounts")
     log.info(f"Target Password: {TARGET_PASSWORD}")
+    log.info(f"Auto-Recycle Browser: Every {RECYCLE_INTERVAL} accounts & upon any error")
+    log.info(f"Live Git Sync: Real-time atomic commit and push on each success")
     log.info(f"=======================================================")
 
-    browser = await launch_async(headless=True)
-    page = await browser.new_page()
-    cdp = await page.context.new_cdp_session(page)
+    session_mgr = CloakSessionManager()
 
     try:
         for k, idx in enumerate(target_indices):
@@ -393,6 +498,8 @@ async def run_password_setter(accounts: list, target_indices: list, delay: float
             log.info(f"\n[{k + 1}/{len(target_indices)}] Account #{num}: {email}")
             log.info(f"  Resetting password to {TARGET_PASSWORD}...")
 
+            page, cdp = await session_mgr.get_session()
+
             try:
                 ok = await reset_single_account(page, cdp, email, recover_key)
                 if ok:
@@ -407,20 +514,25 @@ async def run_password_setter(accounts: list, target_indices: list, delay: float
                         for a in accounts:
                             f.write(f"{a['qwenEmail']}:{TARGET_PASSWORD}\n")
                     log.info(f"  💾 Account #{num} saved with verified password {TARGET_PASSWORD}")
+
+                    # Real-time git push so user never loses work if workflow is cancelled
+                    live_git_sync(f"account #{num} ({email})")
+                    session_mgr.increment()
                 else:
                     fail_count += 1
                     log.warning(f"  ⚠ Failed to set password for #{num}")
+                    # On failure, force refresh the browser session for the next account
+                    await session_mgr.get_session(force_refresh=True)
             except Exception as e:
                 fail_count += 1
                 log.error(f"  ❌ Exception resetting #{num}: {e}")
+                await session_mgr.get_session(force_refresh=True)
 
             if k < len(target_indices) - 1 and delay > 0:
                 await asyncio.sleep(delay)
     finally:
-        try:
-            await browser.close()
-        except Exception:
-            pass
+        await session_mgr.close()
+        live_git_sync("final batch sync")
 
     log.info(f"\n=======================================================")
     log.info(f"SUMMARY: Already Verified: {already_valid_count} | Reset Succeeded: {success_count} | Failed: {fail_count}")

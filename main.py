@@ -240,7 +240,25 @@ def save_account(
 
     print(f"{C_GREEN}💾 Account #{account_num} ({full_name}) saved to: {config.ACCOUNTS_JSON}{C_RESET}")
     print(f"{C_GREEN}💾 Credentials appended to: {config.ACCOUNTS_TXT}{C_RESET}")
+    live_git_sync(f"account #{account_num} ({email})")
     return True
+
+def live_git_sync(action_desc: str = "new account"):
+    """Live atomic commit and push to git repository so generated accounts are persisted immediately."""
+    try:
+        subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "add", "output/accounts.json", "output/accounts.txt"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        diff_res = subprocess.run(["git", "diff", "--staged", "--quiet"], check=False)
+        if diff_res.returncode != 0:
+            msg = f"chore(accounts): live sync {action_desc} [skip ci]"
+            subprocess.run(["git", "commit", "-m", msg], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["git", "pull", "--rebase", "origin", "main"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            push_res = subprocess.run(["git", "push", "origin", "main"], check=False, capture_output=True, text=True)
+            if push_res.returncode == 0:
+                print(f"{C_GREEN}🚀 [Live Git Sync] {action_desc} pushed to GitHub!{C_RESET}")
+    except Exception:
+        pass
 
 def verify_token_details(token: str) -> dict:
     """Call Qwen API with Bearer token to fetch user config."""
