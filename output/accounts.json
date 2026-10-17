@@ -1148,7 +1148,8 @@
     "activationLink": null,
     "createdAt": "2026-10-17T00:20:24.104Z",
     "status": "activated",
-    "token": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSIsInR5cCI6IkpXVCJ9.eyJpZCI6IjBmOGY5OGQxLTYyYTUtNGUxZS04NzA3LWYyNjAyNDI5NGY1ZiIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMTk2NDIyLCJ0eXBlIjoiYWNjZXNzX3Rva2VuIiwiZXhwIjoxNzkyMTk3MzIyLCJpYXQiOjE3OTIxOTY0MjJ9.9Js5x_Rra3_zpPYrPkDw4SYp41JnbNcH6-k4sxFBpYw"
+    "token": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSIsInR5cCI6IkpXVCJ9.eyJpZCI6IjBmOGY5OGQxLTYyYTUtNGUxZS04NzA3LWYyNjAyNDI5NGY1ZiIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMTk2NDIyLCJ0eXBlIjoiYWNjZXNzX3Rva2VuIiwiZXhwIjoxNzkyMTk3MzIyLCJpYXQiOjE3OTIxOTY0MjJ9.9Js5x_Rra3_zpPYrPkDw4SYp41JnbNcH6-k4sxFBpYw",
+    "passwordVerified": true
   },
   {
     "accountNumber": 97,
