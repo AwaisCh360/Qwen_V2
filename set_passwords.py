@@ -8,7 +8,8 @@ Standardizes account passwords to Stronghold1236# via the official reset flow:
      and immediately upon any error to eliminate Aliyun risk score build-up and DOM exhaustion.
    - Takes a snapshot of existing inbox messages so old expired links are never processed.
    - Triggers 'Forget password' on chat.qwen.ai with proactive DOM splash-screen removal.
-   - Solves Aliyun puzzle captcha via CV gap detection & ballistic drag with automatic retry.
+   - Solves Aliyun puzzle captcha via CV gap detection, natural human reaction delay (1.2-1.6s),
+     and ballistic drag with automatic retry.
    - If captcha is rejected or fails, skips polling to save time and recycles session.
    - Polls inbox strictly for brand new incoming reset links (Mazdoor & Maxxspace/Mail.tm).
    - Opens the reset page in the browser context, fills Stronghold1236#, and submits.
@@ -16,6 +17,8 @@ Standardizes account passwords to Stronghold1236# via the official reset flow:
 3. Real-Time Live Persistence & Git Sync:
    - Immediately saves to output/accounts.json and output/accounts.txt upon each success.
    - Real-time Git Commit & Push on every verified account, preventing any lost progress.
+4. Batch Quota Runner & IP Rotation Support:
+   - Supports `--max-resets N` so runners cleanly exit after N accounts to prevent cloud IP rate limits.
 """
 import argparse
 import asyncio
@@ -309,7 +312,7 @@ async def reset_single_account(page, cdp, email: str, recover_key: str = None) -
     """Full automated password reset flow executed in ~12-15s:
     1. Snapshot inbox message IDs
     2. Go to /forget and click 'Send password reset link'
-    3. Solve puzzle slider with CV gap detection & ballistic drag
+    3. Solve puzzle slider with CV gap detection, human reaction pause, & ballistic drag
     4. Fetch brand new reset link from inbox
     5. Navigate to reset link in browser, fill Stronghold1236#, and click 'Reset password'
     """
@@ -326,10 +329,11 @@ async def reset_single_account(page, cdp, email: str, recover_key: str = None) -
                 images[u.rsplit("/", 1)[-1]] = await resp.body()
             except Exception:
                 pass
-        if "auths/reset/password" in u and resp.status == 200:
+        if "auths/reset/password" in u:
             try:
                 txt = await resp.text()
-                if "true" in txt:
+                log.info(f"  [Qwen API Response] status={resp.status} response={txt[:140]}")
+                if resp.status == 200 and "true" in txt:
                     reset_dispatched["v"] = True
             except Exception:
                 pass
@@ -365,10 +369,15 @@ async def reset_single_account(page, cdp, email: str, recover_key: str = None) -
                 log.warning(f"  Attempt {attempt}: Captcha slider not found")
                 if attempt < 3:
                     try:
-                        submit_btn = page.locator("button:has-text(\"Send password reset link\")").first
-                        if await submit_btn.is_visible():
-                            await submit_btn.click(force=True)
+                        refresh_btn = page.locator("#aliyunCaptcha-btn-refresh, .aliyunCaptcha-refresh, #aliyunCaptcha-refresh, [class*='refresh']").first
+                        if await refresh_btn.is_visible():
+                            await refresh_btn.click(force=True)
                             await page.wait_for_timeout(1000)
+                        else:
+                            submit_btn = page.locator("button:has-text(\"Send password reset link\")").first
+                            if await submit_btn.is_visible():
+                                await submit_btn.click(force=True)
+                                await page.wait_for_timeout(1000)
                     except Exception:
                         pass
                 continue
@@ -398,6 +407,9 @@ async def reset_single_account(page, cdp, email: str, recover_key: str = None) -
             dist = float(_invert(target))
             log.info(f"  Attempt {attempt}: Solving puzzle gap at x={g['gap_x']} (drag dist: {dist:.1f}px)...")
 
+            # Natural human reaction pause to locate puzzle hole (1.1 - 1.6s)
+            await asyncio.sleep(random.uniform(1.1, 1.6))
+
             await _human_drag(cdp, slider, dist)
 
             for _ in range(30):
@@ -414,8 +426,8 @@ async def reset_single_account(page, cdp, email: str, recover_key: str = None) -
             images.clear()
             await page.wait_for_timeout(1200)
 
-            # Re-trigger slider if needed
-            refresh_btn = page.locator(".aliyunCaptcha-refresh, #aliyunCaptcha-refresh, [class*='refresh']").first
+            # Re-trigger slider using official Aliyun refresh button
+            refresh_btn = page.locator("#aliyunCaptcha-btn-refresh, .aliyunCaptcha-refresh, #aliyunCaptcha-refresh, [class*='refresh']").first
             if await refresh_btn.is_visible():
                 await refresh_btn.click(force=True)
                 await page.wait_for_timeout(1000)
@@ -429,6 +441,12 @@ async def reset_single_account(page, cdp, email: str, recover_key: str = None) -
                     pass
 
         if not captcha_passed:
+            try:
+                toast = await page.evaluate("() => { const el = document.querySelector('.ant-message, [class*=\"toast\"], [role=\"alert\"]'); return el ? el.innerText : ''; }")
+                if toast:
+                    log.warning(f"  [Qwen Page Alert]: {toast}")
+            except Exception:
+                pass
             log.warning("  ❌ Captcha was not solved. Skipping email polling to save time.")
             return False
 
@@ -467,7 +485,7 @@ async def reset_single_account(page, cdp, email: str, recover_key: str = None) -
             pass
 
 
-async def run_password_setter(accounts: list, target_indices: list, delay: float = 1.0, force: bool = False):
+async def run_password_setter(accounts: list, target_indices: list, delay: float = 1.0, force: bool = False, max_resets: int = 500):
     total = len(accounts)
     success_count = 0
     fail_count = 0
@@ -476,6 +494,7 @@ async def run_password_setter(accounts: list, target_indices: list, delay: float
     log.info(f"\n=======================================================")
     log.info(f"HIGH-SPEED PASSWORD SETTER: Processing {len(target_indices)} Accounts")
     log.info(f"Target Password: {TARGET_PASSWORD}")
+    log.info(f"Batch Limit: Max {max_resets} resets on this runner IP")
     log.info(f"Auto-Recycle Browser: Every {RECYCLE_INTERVAL} accounts & upon any error")
     log.info(f"Live Git Sync: Real-time atomic commit and push on each success")
     log.info(f"=======================================================")
@@ -484,6 +503,12 @@ async def run_password_setter(accounts: list, target_indices: list, delay: float
 
     try:
         for k, idx in enumerate(target_indices):
+            # Check if runner batch quota is reached
+            if success_count >= max_resets:
+                log.info(f"\n✔ Runner batch quota reached: {success_count}/{max_resets} accounts reset on this runner IP.")
+                log.info("  Exiting cleanly to allow runner IP rotation.")
+                break
+
             acc = accounts[idx]
             num = acc.get("accountNumber", idx + 1)
             email = acc.get("qwenEmail")
@@ -542,7 +567,8 @@ async def run_password_setter(accounts: list, target_indices: list, delay: float
 def main():
     parser = argparse.ArgumentParser(description="High-Speed Qwen Account Password Setter")
     parser.add_argument("--start", type=int, default=1, help="Start from account number (1-based)")
-    parser.add_argument("--max", type=int, default=500, help="Maximum accounts to process")
+    parser.add_argument("--max", type=int, default=500, help="Maximum accounts to scan from start")
+    parser.add_argument("--max-resets", type=int, default=500, help="Maximum accounts to reset before exiting (default: 500)")
     parser.add_argument("--latest", type=int, default=None, help="Process the latest N accounts added to accounts.json")
     parser.add_argument("--delay", type=float, default=1.0, help="Delay between accounts in seconds (default: 1.0)")
     parser.add_argument("--force", action="store_true", help="Force password reset even if password already verified")
@@ -569,7 +595,13 @@ def main():
         log.info(f"Targeting range #{start_idx + 1} to #{end_idx} (max {args.max} accounts)")
 
     target_indices = list(range(start_idx, end_idx))
-    asyncio.run(run_password_setter(accounts, target_indices, delay=args.delay, force=args.force))
+    asyncio.run(run_password_setter(
+        accounts,
+        target_indices,
+        delay=args.delay,
+        force=args.force,
+        max_resets=args.max_resets
+    ))
 
 
 if __name__ == "__main__":
