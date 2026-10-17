@@ -429,24 +429,7 @@ def create_one_account(index: int = 1, total: int = 1, max_attempts: int = 2) ->
             print(f"  {C_GREEN}✔ Account token verified against chat.qwen.ai API!{C_RESET}")
 
         # ---------------------------------------------------------
-        # Step 5: Set Permanent Password on Qwen Backend
-        # ---------------------------------------------------------
-        print(f"\n{C_BOLD}[Step 5]{C_RESET} Setting permanent password ({DEFAULT_PASSWORD}) on Qwen backend...")
-        try:
-            from set_passwords import reset_account_password
-            pw_ok, fresh_token = asyncio.run(reset_account_password(email, recover_key=mail.session_id if mail else None))
-            if pw_ok:
-                print(f"  {C_GREEN}✔ Password successfully registered as {DEFAULT_PASSWORD} on Qwen backend!{C_RESET}")
-                if fresh_token:
-                    token = fresh_token
-                    print(f"  {C_GREEN}✔ Upgraded to genuine 30-day token!{C_RESET}")
-            else:
-                print(f"  {C_YELLOW}⚠ Immediate reset skipped/deferred to workflow step.{C_RESET}")
-        except Exception as e:
-            print(f"  {C_YELLOW}⚠ Password setting notice: {e}{C_RESET}")
-
-        # ---------------------------------------------------------
-        # Step 6: Save Credentials (STRICT GUARD)
+        # Step 5: Save Credentials (STRICT GUARD)
         # ---------------------------------------------------------
         saved = save_account(
             email=email,

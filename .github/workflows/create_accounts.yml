@@ -59,14 +59,6 @@ jobs:
         run: |
           xvfb-run -a python main.py --count ${{ github.event.inputs.count }} --delay ${{ github.event.inputs.delay }}
 
-      - name: Ensure Standard Password Set on Qwen Backend
-        if: always()
-        env:
-          PYTHONUNBUFFERED: "1"
-          MAZDOOR_API_KEY: ${{ secrets.MAZDOOR_API_KEY || 'tk_0a65841dd0a074510cc79e8c16ee3ca18e9fe5a4d5f95634' }}
-        run: |
-          xvfb-run -a python set_passwords.py --latest ${{ github.event.inputs.count }} --delay 2
-
       - name: Commit and Push Generated Accounts to Repository
         if: always()
         run: |

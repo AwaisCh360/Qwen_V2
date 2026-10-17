@@ -101,7 +101,7 @@ async def _human_drag(cdp, slider: dict, dist: float):
     await cdp.send("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": tx, "y": sy, "button": "left", "buttons": 0, "clickCount": 1})
 
 
-def fetch_reset_link_from_inbox(email: str, recover_key: str = None, timeout: int = 45) -> tuple[str, str]:
+def fetch_reset_link_from_inbox(email: str, recover_key: str = None, timeout: int = 30) -> tuple[str, str]:
     """Poll inbox for the Qwen password reset link."""
     domain = email.split("@")[1].lower()
     t_start = time.time()
@@ -345,7 +345,7 @@ async def reset_account_password(email: str, recover_key: str = None) -> tuple[b
     await browser.close()
 
     # Step 4: Fetch reset link from inbox
-    reset_id, reset_token = fetch_reset_link_from_inbox(email, recover_key, timeout=45)
+    reset_id, reset_token = fetch_reset_link_from_inbox(email, recover_key, timeout=30)
     if not reset_id or not reset_token:
         log.error(f"  ❌ Timed out waiting for reset link email for {email}")
         return False, None
