@@ -185,12 +185,10 @@ def save_account(
                 for a in raw:
                     if not isinstance(a, dict):
                         continue
-                    t = a.get("token")
-                    if t and isinstance(t, str) and t.strip() and t != "NO_TOKEN":
-                        num = a.get("accountNumber")
-                        if isinstance(num, int):
-                            max_num = max(max_num, num)
-                        accounts.append(a)
+                    num = a.get("accountNumber")
+                    if isinstance(num, int):
+                        max_num = max(max_num, num)
+                    accounts.append(a)
         except Exception:
             accounts = []
 
