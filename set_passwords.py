@@ -18,6 +18,7 @@ import random
 import re
 import sys
 import time
+import os
 from pathlib import Path
 
 import numpy as np
@@ -39,7 +40,7 @@ ACCOUNTS_TXT = BASE_DIR / "output" / "accounts.txt"
 
 TARGET_PASSWORD = "Stronghold1236#"
 TARGET_PASSWORD_HASH = hashlib.sha256(TARGET_PASSWORD.encode()).hexdigest()
-MAZDOOR_API_KEY = "tk_0a65841dd0a074510cc79e8c16ee3ca18e9fe5a4d5f95634"
+MAZDOOR_API_KEY = os.getenv("MAZDOOR_API_KEY", "tk_0a65841dd0a074510cc79e8c16ee3ca18e9fe5a4d5f95634").strip()
 
 _COEF = (0.00355, 0.0769, -0.004)
 
@@ -379,6 +380,7 @@ def main():
     parser = argparse.ArgumentParser(description="Set Qwen account passwords to Stronghold1236#")
     parser.add_argument("--start", type=int, default=1, help="Start from account number (1-based)")
     parser.add_argument("--max", type=int, default=151, help="Maximum accounts to process")
+    parser.add_argument("--latest", type=int, default=None, help="Process the latest N accounts added to accounts.json")
     parser.add_argument("--delay", type=float, default=2.0, help="Delay between accounts in seconds")
     args = parser.parse_args()
 
@@ -392,8 +394,14 @@ def main():
     total = len(accounts)
     log.info(f"Loaded {total} accounts from {ACCOUNTS_JSON}")
 
-    start_idx = max(0, args.start - 1)
-    end_idx = min(total, start_idx + args.max)
+    if args.latest is not None:
+        count = max(1, args.latest)
+        start_idx = max(0, total - count)
+        end_idx = total
+        log.info(f"Targeting latest {count} account(s): from #{start_idx + 1} to #{end_idx}")
+    else:
+        start_idx = max(0, args.start - 1)
+        end_idx = min(total, start_idx + args.max)
 
     success_count = 0
     fail_count = 0
