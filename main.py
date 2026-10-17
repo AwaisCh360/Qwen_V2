@@ -167,6 +167,16 @@ def save_account(
         full_name = _gen_full_name()
     if not password:
         password = _gen_password()
+    if not recover_key and "mazdoor.me" in email.lower():
+        try:
+            m_client = MazdoorMail()
+            for inb in m_client.list_inboxes():
+                if inb.get("address", "").lower() == email.lower() and inb.get("token"):
+                    recover_key = inb.get("token")
+                    break
+        except Exception:
+            pass
+
     if not recover_key:
         recover_key = (''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ', k=7)) + str(random.randint(100000, 999999)))
 
@@ -269,6 +279,8 @@ def create_one_account(index: int = 1, total: int = 1, max_attempts: int = 2) ->
             print(f"{C_RED}❌ Failed to create Mazdoor email inbox.{C_RESET}")
             continue
         print(f"  {C_GREEN}✔ Generated Email:{C_RESET} {C_BOLD}{email}{C_RESET}")
+        if mail.recover_key:
+            print(f"  {C_CYAN}✔ Mazdoor Recovery Token:{C_RESET} {C_BOLD}{mail.recover_key}{C_RESET}")
 
         # -------------------------------------------------------------
         # Step 2: Solve Captcha & Send OTP (Hybrid: API or Direct)
@@ -431,12 +443,13 @@ def create_one_account(index: int = 1, total: int = 1, max_attempts: int = 2) ->
         # ---------------------------------------------------------
         # Step 5: Save Credentials (STRICT GUARD)
         # ---------------------------------------------------------
+        recover_token = (mail.recover_key or mail.token) if mail else None
         saved = save_account(
             email=email,
             token=token,
             cookies=cookies,
             password=DEFAULT_PASSWORD,
-            recover_key=mail.session_id if mail else None,
+            recover_key=recover_token,
             status="activated"
         )
         if saved:

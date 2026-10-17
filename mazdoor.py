@@ -14,6 +14,8 @@ class MazdoorMail:
         self.api_key = api_key or config.MAZDOOR_API_KEY
         self.session_id = None
         self.email = None
+        self.token = None
+        self.recover_key = None
         self.http = requests.Session()
         self.http.headers.update({
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -26,6 +28,7 @@ class MazdoorMail:
         """
         Creates an inbox on Mazdoor API. Uses x-api-key if available,
         otherwise falls back to anonymous session token.
+        Saves both self.email and self.recover_key (inbox recovery token).
         """
         try:
             headers = {"Content-Type": "application/json"}
@@ -50,10 +53,45 @@ class MazdoorMail:
                 return None
             inbox_data = res2.json()
             self.email = inbox_data.get("address")
+            self.token = inbox_data.get("token")
+            self.recover_key = self.token
+
+            # Fallback if token wasn't in POST response
+            if not self.recover_key and self.email:
+                try:
+                    for item in self.list_inboxes():
+                        if item.get("address") == self.email and item.get("token"):
+                            self.token = item.get("token")
+                            self.recover_key = self.token
+                            break
+                except Exception:
+                    pass
+
             return self.email
         except Exception as e:
             logger.error(f"Exception creating Mazdoor inbox: {e}")
             return None
+
+    def recover_inbox(self, token: str) -> str | None:
+        """Restores an inbox session using an inbox recovery token."""
+        try:
+            if not self.session_id:
+                s_res = self.http.get(f"{config.MAZDOOR_BASE_URL}/session", timeout=config.REQUEST_TIMEOUT)
+                if s_res.status_code == 200:
+                    self.session_id = s_res.json().get("sessionId")
+            headers = {"Content-Type": "application/json"}
+            if self.session_id:
+                headers["x-session-id"] = self.session_id
+            res = self.http.post(f"{config.MAZDOOR_BASE_URL}/recover", headers=headers, json={"token": token}, timeout=config.REQUEST_TIMEOUT)
+            if res.status_code == 200:
+                data = res.json()
+                self.email = data.get("address")
+                self.token = data.get("token")
+                self.recover_key = self.token
+                return self.email
+        except Exception as e:
+            logger.error(f"Exception recovering inbox: {e}")
+        return None
 
     def get_otp_code(self, timeout: int = 90) -> str | None:
         """

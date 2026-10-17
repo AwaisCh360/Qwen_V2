@@ -117,12 +117,25 @@ def fetch_reset_link_from_inbox(email: str, recover_key: str = None, timeout: in
                     timeout=8
                 )
                 if r.status_code != 200 and recover_key:
-                    # Fallback to session id
-                    r = requests.get(
-                        f"https://berozgaar.mazdoor.me/api/inboxes/{email}/messages",
-                        headers={"x-session-id": recover_key},
-                        timeout=8
-                    )
+                    if len(str(recover_key)) == 24 and str(recover_key).count("-") == 4:
+                        # Genuine Mazdoor inbox recovery token: restore into an active session
+                        try:
+                            s_sess = requests.get("https://berozgaar.mazdoor.me/api/session", timeout=5).json().get("sessionId")
+                            requests.post("https://berozgaar.mazdoor.me/api/recover", headers={"x-session-id": s_sess}, json={"token": recover_key}, timeout=5)
+                            r = requests.get(
+                                f"https://berozgaar.mazdoor.me/api/inboxes/{email}/messages",
+                                headers={"x-session-id": s_sess},
+                                timeout=8
+                            )
+                        except Exception:
+                            pass
+                    else:
+                        # Fallback to session id
+                        r = requests.get(
+                            f"https://berozgaar.mazdoor.me/api/inboxes/{email}/messages",
+                            headers={"x-session-id": recover_key},
+                            timeout=8
+                        )
                 if r.status_code == 200:
                     messages = r.json()
                     for m in messages:
