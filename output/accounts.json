@@ -1962,7 +1962,8 @@
     "activationLink": null,
     "createdAt": "2026-10-17T08:52:02.798Z",
     "status": "activated",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImRmMmU5MzZjLTY3NDgtNDExNy05MGY3LWJhNDY1NjI5MGY3MCIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMjIzMjE1LCJleHAiOjE3OTQ4MTkxMjN9.OdQgNOyoIU-YDPFEKYSKZvj93e3bI85iH1ayX3dL3l4"
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImRmMmU5MzZjLTY3NDgtNDExNy05MGY3LWJhNDY1NjI5MGY3MCIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMjIzMjE1LCJleHAiOjE3OTQ4MTkxMjN9.OdQgNOyoIU-YDPFEKYSKZvj93e3bI85iH1ayX3dL3l4",
+    "passwordVerified": true
   },
   {
     "accountNumber": 165,
