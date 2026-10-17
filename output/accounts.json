@@ -920,7 +920,8 @@
     "activationLink": null,
     "createdAt": "2026-10-16T18:07:34.042Z",
     "status": "activated",
-    "token": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSIsInR5cCI6IkpXVCJ9.eyJpZCI6IjE3Y2IyZjA4LTE5ZGItNDdmYi1iMWMxLWJmNzQwYjY5NDg3NyIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMTc0MDUyLCJ0eXBlIjoiYWNjZXNzX3Rva2VuIiwiZXhwIjoxNzkyMTc0OTUyLCJpYXQiOjE3OTIxNzQwNTJ9.ke26-YcbaAaKfQgwMxUg3HehBv9O7dUKnY85CULBRhw"
+    "token": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImxlZ2FjeSIsInR5cCI6IkpXVCJ9.eyJpZCI6IjE3Y2IyZjA4LTE5ZGItNDdmYi1iMWMxLWJmNzQwYjY5NDg3NyIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMTc0MDUyLCJ0eXBlIjoiYWNjZXNzX3Rva2VuIiwiZXhwIjoxNzkyMTc0OTUyLCJpYXQiOjE3OTIxNzQwNTJ9.ke26-YcbaAaKfQgwMxUg3HehBv9O7dUKnY85CULBRhw",
+    "passwordVerified": true
   },
   {
     "accountNumber": 78,
