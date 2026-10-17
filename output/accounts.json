@@ -1702,7 +1702,8 @@
     "activationLink": null,
     "createdAt": "2026-10-17T08:51:53.259Z",
     "status": "activated",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjUwOGVlZmFmLWE5OTMtNDRiZi1hZDA4LWQxODFkZjZhNDM0NCIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMjIyNjg2LCJleHAiOjE3OTQ4MTkxMTN9.GBIVp-hfCq3AuvjFdiujFeRqtJJo9JkCsp7FCoqE3HA"
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjUwOGVlZmFmLWE5OTMtNDRiZi1hZDA4LWQxODFkZjZhNDM0NCIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMjIyNjg2LCJleHAiOjE3OTQ4MTkxMTN9.GBIVp-hfCq3AuvjFdiujFeRqtJJo9JkCsp7FCoqE3HA",
+    "passwordVerified": true
   },
   {
     "accountNumber": 156,
@@ -1713,7 +1714,8 @@
     "activationLink": null,
     "createdAt": "2026-10-17T08:51:54.251Z",
     "status": "activated",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImQ3YTlhNDY4LWFiYTgtNDFhZS04OTFhLTYyOTA0ZmFhMTkzMSIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMjIyNzQ0LCJleHAiOjE3OTQ4MTkxMTR9.SgDjqRK4tjc0ge4tNlpGwZWNrbHfK8ZAWeYFBknkK50"
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImQ3YTlhNDY4LWFiYTgtNDFhZS04OTFhLTYyOTA0ZmFhMTkzMSIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMjIyNzQ0LCJleHAiOjE3OTQ4MTkxMTR9.SgDjqRK4tjc0ge4tNlpGwZWNrbHfK8ZAWeYFBknkK50",
+    "passwordVerified": true
   },
   {
     "accountNumber": 157,
@@ -1779,7 +1781,8 @@
     "activationLink": null,
     "createdAt": "2026-10-17T08:52:00.480Z",
     "status": "activated",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImE2MmIzZDg2LTZkYTgtNDlkNy1hOWFkLWQ2ZmE5ODdkOTg1ZSIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMjIzMTAwLCJleHAiOjE3OTQ4MTkxMjB9.UYfgzRxi8Y8aoVZRMz_D9CwHWsVMm4rHO2cv7c_XugM"
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImE2MmIzZDg2LTZkYTgtNDlkNy1hOWFkLWQ2ZmE5ODdkOTg1ZSIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzkyMjIzMTAwLCJleHAiOjE3OTQ4MTkxMjB9.UYfgzRxi8Y8aoVZRMz_D9CwHWsVMm4rHO2cv7c_XugM",
+    "passwordVerified": true
   },
   {
     "accountNumber": 163,
